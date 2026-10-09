@@ -1,8 +1,8 @@
 # Data and checkpoints
 
 All files below are downloaded by `scripts/download_assets.sh` into `artifacts/`.
-The pools are hosted at [Gabriel166/MORAD-data](https://huggingface.co/datasets/Gabriel166/MORAD-data)
-and the MORAD checkpoint at [Gabriel166/MORAD](https://huggingface.co/Gabriel166/MORAD).
+The pools are hosted at [MORAD-RNA/MORAD-Targets](https://huggingface.co/datasets/MORAD-RNA/MORAD-Targets)
+and the MORAD checkpoint at [MORAD-RNA/MORAD-RIDE](https://huggingface.co/MORAD-RNA/MORAD-RIDE).
 
 ## Target pools
 

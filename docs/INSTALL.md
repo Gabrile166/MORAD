@@ -92,8 +92,8 @@ bash scripts/download_assets.sh
 |---|---|---|
 | `ride` | `artifacts/models/ride/checkpoint.h5` | [RIDER](https://github.com/COLA-Laboratory/RIDER) release (SHA-256 checked) |
 | `rhofold` | `../third_party/rhofold_protocol/checkpoints/rhofold_pretrained_params.pt` | [RhoFold+ weights](https://huggingface.co/cuhkaih/rhofold) (SHA-256 checked) |
-| `data` | `artifacts/pools/{train527.pt, test153.pt, test153_native_2d.json}` | [Gabriel166/MORAD-data](https://huggingface.co/datasets/Gabriel166/MORAD-data) (SHA-256 checked) |
-| `morad` | `artifacts/models/morad/morad_update390.pt` | [Gabriel166/MORAD](https://huggingface.co/Gabriel166/MORAD) (SHA-256 checked) |
+| `data` | `artifacts/pools/{train527.pt, test153.pt, test153_native_2d.json}` | [MORAD-RNA/MORAD-Targets](https://huggingface.co/datasets/MORAD-RNA/MORAD-Targets) (SHA-256 checked) |
+| `morad` | `artifacts/models/morad/morad_update390.pt` | [MORAD-RNA/MORAD-RIDE](https://huggingface.co/MORAD-RNA/MORAD-RIDE) (SHA-256 checked) |
 
 Single components can be fetched with, e.g., `bash scripts/download_assets.sh ride rhofold`.
 See [DATA.md](DATA.md) for the content of each file.

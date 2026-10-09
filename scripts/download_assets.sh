@@ -13,8 +13,8 @@ set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 third_party_root="${MORAD_THIRD_PARTY:-$(cd "${repo_root}/.." && pwd)/third_party}"
-hf_data="${MORAD_HF_DATA:-Gabriel166/MORAD-data}"
-hf_model="${MORAD_HF_MODEL:-Gabriel166/MORAD}"
+hf_data="${MORAD_HF_DATA:-MORAD-RNA/MORAD-Targets}"
+hf_model="${MORAD_HF_MODEL:-MORAD-RNA/MORAD-RIDE}"
 
 RIDE_URL="https://github.com/COLA-Laboratory/RIDER/raw/799f9a0f6587b725c6319dcc24e423e65bcc3682/saved_models/checkpoint.h5"
 RIDE_SHA256="09465b6195356a5c76a1e83cd7e2ed86a5972abfda7ae903d3a6025a5283b123"
@@ -70,12 +70,12 @@ for component in "${components[@]}"; do
             ;;
         data)
             data_url="https://huggingface.co/datasets/${hf_data}/resolve/main/data"
-            fetch "${data_url}/train_pool_527.pt" "${repo_root}/artifacts/pools/train527.pt" "${TRAIN_SHA256}"
-            fetch "${data_url}/eval_pool_153.pt" "${repo_root}/artifacts/pools/test153.pt" "${TEST_SHA256}"
-            fetch "${data_url}/test153_native_2d.json" "${repo_root}/artifacts/pools/test153_native_2d.json"
+            fetch "${data_url}/train.pt" "${repo_root}/artifacts/pools/train527.pt" "${TRAIN_SHA256}"
+            fetch "${data_url}/test.pt" "${repo_root}/artifacts/pools/test153.pt" "${TEST_SHA256}"
+            fetch "${data_url}/test_native_pairs.json" "${repo_root}/artifacts/pools/test153_native_2d.json"
             ;;
         morad)
-            fetch "https://huggingface.co/${hf_model}/resolve/main/policy_step000390.pt" \
+            fetch "https://huggingface.co/${hf_model}/resolve/main/morad_ride.pt" \
                 "${repo_root}/artifacts/models/morad/morad_update390.pt" "${MORAD_SHA256}"
             ;;
         *)
