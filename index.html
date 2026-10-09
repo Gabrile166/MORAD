@@ -1,0 +1,606 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MORAD · Multi-Objective Rewards for RNA Inverse Design</title>
+<meta name="description" content="MORAD is an online reinforcement learning framework that post-trains a single backbone-conditioned RNA diffusion policy with a six-objective reward.">
+<meta property="og:type" content="website">
+<meta property="og:title" content="MORAD: Reinforcement Learning with Multi-Objective Rewards for RNA Inverse Design">
+<meta property="og:description" content="One shared backbone-conditioned RNA diffusion policy, post-trained online with a six-objective reward. GDT-TS +16.0%, pairing MCC +19.4%, ensemble defect −27.5% over pretrained RIDE.">
+<meta property="og:image" content="https://gabrile166.github.io/MORAD/static/images/overview.png">
+<meta property="og:url" content="https://gabrile166.github.io/MORAD/">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%230f766e'/%3E%3Cpath d='M18 14c16 8 16 28 0 36M46 14c-16 8-16 28 0 36' stroke='white' stroke-width='5' fill='none' stroke-linecap='round'/%3E%3Cpath d='M24 24h16M24 32h16M24 40h16' stroke='%2399f6e4' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Source+Serif+4:opsz,wght@8..60,500;8..60,600;8..60,700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<style>
+:root {
+  --bg: #f8f7f4;
+  --surface: #ffffff;
+  --surface-2: #f1f0ec;
+  --ink: #18181b;
+  --ink-2: #3f3f46;
+  --muted: #6b6b73;
+  --line: #e4e2dc;
+  --accent: #0f766e;
+  --accent-ink: #0b5e58;
+  --accent-soft: #e3f4f1;
+  --accent-line: #b7e1da;
+  --warm: #c2410c;
+  --code-bg: #f3f2ee;
+  --shadow: 0 1px 2px rgba(24, 24, 27, .04), 0 8px 24px -12px rgba(24, 24, 27, .12);
+  --radius: 14px;
+  --max: 1080px;
+  --serif: "Source Serif 4", Georgia, "Times New Roman", serif;
+  --sans: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0d1111;
+    --surface: #141a1a;
+    --surface-2: #1a2121;
+    --ink: #ecebe8;
+    --ink-2: #cfcdc8;
+    --muted: #9a9a96;
+    --line: #273030;
+    --accent: #2dd4bf;
+    --accent-ink: #5eead4;
+    --accent-soft: rgba(45, 212, 191, .10);
+    --accent-line: rgba(45, 212, 191, .32);
+    --warm: #fb923c;
+    --code-bg: #101616;
+    --shadow: 0 1px 2px rgba(0, 0, 0, .3), 0 8px 24px -12px rgba(0, 0, 0, .5);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0d1111;
+  --surface: #141a1a;
+  --surface-2: #1a2121;
+  --ink: #ecebe8;
+  --ink-2: #cfcdc8;
+  --muted: #9a9a96;
+  --line: #273030;
+  --accent: #2dd4bf;
+  --accent-ink: #5eead4;
+  --accent-soft: rgba(45, 212, 191, .10);
+  --accent-line: rgba(45, 212, 191, .32);
+  --warm: #fb923c;
+  --code-bg: #101616;
+  --shadow: 0 1px 2px rgba(0, 0, 0, .3), 0 8px 24px -12px rgba(0, 0, 0, .5);
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; scroll-padding-top: 72px; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font: 400 16.5px/1.7 var(--sans);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+a { color: var(--accent-ink); text-decoration: none; }
+a:hover { text-decoration: underline; text-underline-offset: 3px; }
+img { max-width: 100%; display: block; }
+.wrap { max-width: var(--max); margin: 0 auto; padding: 0 16px; }
+@media (min-width: 720px) { .wrap { padding: 0 32px; } }
+
+/* nav */
+.nav {
+  position: sticky; top: 0; z-index: 20;
+  background: color-mix(in srgb, var(--bg) 82%, transparent);
+  backdrop-filter: saturate(160%) blur(12px);
+  -webkit-backdrop-filter: saturate(160%) blur(12px);
+  border-bottom: 1px solid var(--line);
+}
+.nav .wrap { display: flex; align-items: center; gap: 20px; height: 56px; }
+.brand { font: 700 17px/1 var(--sans); letter-spacing: .02em; color: var(--ink); display: flex; align-items: center; gap: 10px; }
+.brand:hover { text-decoration: none; }
+.brand-mark { width: 22px; height: 22px; border-radius: 6px; background: var(--accent); display: grid; place-items: center; }
+.nav-links { display: none; gap: 22px; margin-left: auto; font-size: 14px; }
+.nav-links a { color: var(--muted); }
+.nav-links a:hover { color: var(--ink); text-decoration: none; }
+@media (min-width: 820px) { .nav-links { display: flex; } }
+.theme-btn {
+  margin-left: auto; width: 34px; height: 34px; border-radius: 9px; border: 1px solid var(--line);
+  background: var(--surface); color: var(--ink-2); display: grid; place-items: center; cursor: pointer;
+}
+@media (min-width: 820px) { .theme-btn { margin-left: 8px; } }
+
+/* hero */
+.hero { padding: 64px 0 28px; text-align: center; }
+.eyebrow {
+  display: inline-flex; align-items: center; gap: 8px;
+  font: 600 12.5px/1 var(--sans); letter-spacing: .08em; text-transform: uppercase;
+  color: var(--accent-ink); background: var(--accent-soft); border: 1px solid var(--accent-line);
+  padding: 7px 12px; border-radius: 999px;
+}
+h1 {
+  font: 700 clamp(44px, 9vw, 84px)/1 var(--serif);
+  letter-spacing: -.02em; margin: 22px 0 10px;
+}
+h1 .grad {
+  background: linear-gradient(100deg, var(--accent) 10%, #3b82f6 55%, var(--warm) 95%);
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+.subtitle {
+  font: 600 clamp(20px, 3.2vw, 30px)/1.3 var(--serif);
+  color: var(--ink); max-width: 820px; margin: 0 auto; letter-spacing: -.005em;
+}
+.authors { margin: 26px 0 4px; font-size: 18px; color: var(--ink); }
+.authors span { white-space: nowrap; margin: 0 10px; }
+.authors sup { color: var(--accent-ink); font-weight: 600; }
+.affil { color: var(--ink-2); font-size: 16px; }
+.note { color: var(--muted); font-size: 13.5px; margin-top: 4px; }
+
+.links { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; margin: 30px 0 8px; }
+.btn {
+  display: inline-flex; align-items: center; gap: 8px; height: 42px; padding: 0 18px;
+  border-radius: 999px; font: 600 14.5px/1 var(--sans);
+  background: var(--ink); color: var(--bg); border: 1px solid var(--ink);
+  transition: transform .15s ease, box-shadow .15s ease, background .15s ease;
+}
+.btn:hover { text-decoration: none; transform: translateY(-1px); box-shadow: var(--shadow); }
+.btn svg { width: 17px; height: 17px; flex: none; }
+.btn.ghost { background: var(--surface); color: var(--ink); border-color: var(--line); }
+.btn.soon { background: transparent; color: var(--muted); border: 1px dashed var(--line); cursor: default; }
+.btn.soon:hover { transform: none; box-shadow: none; }
+.btn .tag { font: 500 11px/1 var(--sans); padding: 4px 7px; border-radius: 999px; background: var(--surface-2); color: var(--muted); }
+
+/* figure card */
+.figure {
+  margin: 34px 0 0; background: #fff; border: 1px solid var(--line); border-radius: var(--radius);
+  padding: clamp(10px, 2vw, 22px); box-shadow: var(--shadow);
+}
+.figure img { width: 100%; height: auto; border-radius: 6px; }
+.caption { color: var(--muted); font-size: 14.5px; line-height: 1.6; margin: 14px 2px 0; text-align: left; }
+.caption b { color: var(--ink-2); }
+
+/* stats */
+.stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin: 36px 0 8px; }
+@media (min-width: 860px) { .stats { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; } }
+.stat {
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius);
+  padding: 18px 18px 16px; text-align: left; position: relative; overflow: hidden;
+}
+.stat::before { content: ""; position: absolute; inset: 0 auto 0 0; width: 3px; background: var(--accent); opacity: .8; }
+.stat .num { font: 700 clamp(28px, 4.4vw, 38px)/1.05 var(--serif); letter-spacing: -.01em; color: var(--accent-ink); font-variant-numeric: tabular-nums; }
+.stat .lbl { font: 600 14px/1.35 var(--sans); margin-top: 8px; color: var(--ink); }
+.stat .sub { font-size: 13px; color: var(--muted); margin-top: 3px; font-variant-numeric: tabular-nums; }
+
+/* sections */
+section { padding: 56px 0 8px; }
+.sec-head { display: flex; align-items: baseline; gap: 14px; margin-bottom: 18px; }
+.sec-num { font: 500 13px/1 var(--mono); color: var(--accent-ink); }
+h2 { font: 700 clamp(26px, 3.6vw, 34px)/1.15 var(--serif); letter-spacing: -.01em; margin: 0; }
+h3 { font: 600 19px/1.3 var(--sans); margin: 34px 0 10px; letter-spacing: -.005em; }
+p { margin: 0 0 14px; color: var(--ink-2); }
+.lead { font-size: 17.5px; color: var(--ink-2); max-width: 900px; }
+.abstract {
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius);
+  padding: clamp(20px, 3vw, 34px); font-size: 16.5px; line-height: 1.8; color: var(--ink-2);
+  text-align: justify; hyphens: auto;
+}
+.abstract strong { color: var(--ink); }
+
+/* pillars */
+.pillars { display: grid; gap: 14px; grid-template-columns: 1fr; margin-top: 8px; }
+@media (min-width: 860px) { .pillars { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+.pillar { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 20px; }
+.pillar .ic { width: 36px; height: 36px; border-radius: 10px; background: var(--accent-soft); color: var(--accent-ink); display: grid; place-items: center; margin-bottom: 12px; }
+.pillar h4 { font: 600 16px/1.35 var(--sans); margin: 0 0 6px; color: var(--ink); }
+.pillar p { font-size: 14.5px; line-height: 1.6; margin: 0; color: var(--muted); }
+
+/* formula */
+.eqs { display: grid; gap: 12px; grid-template-columns: 1fr; margin: 18px 0 6px; }
+@media (min-width: 860px) { .eqs { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+.eq { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px 10px; overflow-x: auto; }
+.eq .k { font: 600 11.5px/1 var(--sans); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.eq .katex-display { margin: 10px 0 4px; }
+
+/* tables */
+.tbl-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); -webkit-overflow-scrolling: touch; }
+table { width: 100%; border-collapse: collapse; font-size: 14.5px; font-variant-numeric: tabular-nums; }
+th, td { padding: 11px 14px; text-align: right; white-space: nowrap; border-bottom: 1px solid var(--line); }
+th:first-child, td:first-child { text-align: left; position: sticky; left: 0; background: inherit; }
+thead th { font: 600 12.5px/1.3 var(--sans); color: var(--muted); background: var(--surface-2); letter-spacing: .01em; }
+thead th:first-child { background: var(--surface-2); }
+tbody tr { background: var(--surface); }
+tbody tr:last-child td { border-bottom: 0; }
+tbody tr.ours { background: var(--accent-soft); }
+tbody tr.ours td:first-child { font-weight: 700; color: var(--accent-ink); background: color-mix(in srgb, var(--surface) 88%, var(--accent)); }
+td b { color: var(--ink); font-weight: 700; }
+.tbl-note { font-size: 13.5px; color: var(--muted); margin: 10px 2px 0; }
+.anchors td:first-child { white-space: normal; }
+
+.tabs { display: flex; flex-wrap: wrap; gap: 8px; margin: 6px 0 14px; }
+.tab {
+  font: 600 14px/1 var(--sans); padding: 10px 14px; border-radius: 999px; cursor: pointer;
+  border: 1px solid var(--line); background: var(--surface); color: var(--ink-2);
+}
+.tab[aria-selected="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.js .panel[hidden] { display: none; }
+.panel-cap { font-size: 14.5px; color: var(--muted); margin: 0 2px 12px; }
+
+/* data */
+.split { display: grid; gap: 14px; grid-template-columns: repeat(2, minmax(0, 1fr)); margin: 6px 0 18px; }
+.tile { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 18px 20px; }
+.tile .num { font: 700 36px/1 var(--serif); color: var(--ink); }
+.tile .lbl { font: 600 14px/1.3 var(--sans); margin-top: 8px; }
+.tile .sub { font-size: 13.5px; color: var(--muted); }
+
+/* code */
+.code {
+  position: relative; background: var(--code-bg); border: 1px solid var(--line); border-radius: 12px;
+  padding: 16px 18px; overflow-x: auto; font: 400 13.5px/1.75 var(--mono); color: var(--ink);
+}
+.code pre { margin: 0; }
+.code .c { color: var(--muted); }
+.copy {
+  position: absolute; top: 10px; right: 10px; font: 600 12px/1 var(--sans); padding: 7px 10px;
+  border-radius: 8px; border: 1px solid var(--line); background: var(--surface); color: var(--ink-2); cursor: pointer;
+}
+.copy:hover { color: var(--ink); }
+
+.res-links { display: grid; gap: 12px; grid-template-columns: 1fr; margin-top: 18px; }
+@media (min-width: 720px) { .res-links { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+.res {
+  display: flex; gap: 12px; align-items: flex-start; background: var(--surface); border: 1px solid var(--line);
+  border-radius: 12px; padding: 14px 16px; color: var(--ink);
+}
+.res:hover { text-decoration: none; border-color: var(--accent-line); }
+.res .ic { font-size: 20px; line-height: 1; margin-top: 2px; }
+.res b { display: block; font-size: 15px; }
+.res span { font-size: 13.5px; color: var(--muted); }
+
+footer { margin-top: 72px; border-top: 1px solid var(--line); padding: 28px 0 44px; color: var(--muted); font-size: 14px; }
+footer p { color: var(--muted); font-size: 14px; }
+</style>
+</head>
+<body>
+
+<nav class="nav" aria-label="Sections">
+  <div class="wrap">
+    <a class="brand" href="#top"><span class="brand-mark"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round"><path d="M6 3c7 4 7 14 0 18M18 3c-7 4-7 14 0 18"/></svg></span>MORAD</a>
+    <div class="nav-links">
+      <a href="#abstract">Abstract</a>
+      <a href="#method">Method</a>
+      <a href="#results">Results</a>
+      <a href="#data">Data</a>
+      <a href="#code">Code</a>
+      <a href="#citation">Citation</a>
+    </div>
+    <button class="theme-btn" id="theme" type="button" aria-label="Toggle color theme">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
+    </button>
+  </div>
+</nav>
+
+<main id="top">
+  <header class="hero">
+    <div class="wrap">
+      <span class="eyebrow">RNA inverse design · Reinforcement learning</span>
+      <h1><span class="grad">MORAD</span></h1>
+      <p class="subtitle">Reinforcement Learning with Multi-Objective Rewards for RNA Inverse Design</p>
+      <div class="authors">
+        <span>Jixin Tang<sup>*</sup></span>
+        <span>Ji Guo<sup>*</sup></span>
+        <span>Jun Zhao<sup>†</sup></span>
+      </div>
+      <div class="affil">Fudan University</div>
+      <div class="note"><sup>*</sup>Equal contribution &nbsp;·&nbsp; <sup>†</sup>Corresponding author</div>
+
+      <div class="links">
+        <span class="btn soon" aria-disabled="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M8 13h8M8 17h5"/></svg>
+          Paper <span class="tag">coming soon</span>
+        </span>
+        <a class="btn" href="https://github.com/Gabrile166/MORAD">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 .5C5.65.5.5 5.65.5 12a11.5 11.5 0 0 0 7.86 10.92c.58.1.79-.25.79-.56v-2c-3.2.7-3.87-1.37-3.87-1.37-.53-1.33-1.28-1.69-1.28-1.69-1.05-.72.08-.7.08-.7 1.16.08 1.77 1.19 1.77 1.19 1.03 1.77 2.7 1.26 3.36.96.1-.75.4-1.26.73-1.55-2.55-.29-5.24-1.28-5.24-5.68 0-1.26.45-2.28 1.19-3.09-.12-.29-.52-1.46.11-3.05 0 0 .97-.31 3.17 1.18a11 11 0 0 1 5.77 0c2.2-1.49 3.17-1.18 3.17-1.18.63 1.59.23 2.76.11 3.05.74.81 1.19 1.83 1.19 3.09 0 4.41-2.69 5.38-5.26 5.67.41.36.78 1.06.78 2.14v3.17c0 .31.21.67.8.56A11.5 11.5 0 0 0 23.5 12C23.5 5.65 18.35.5 12 .5z"/></svg>
+          Code
+        </a>
+        <a class="btn ghost" href="https://huggingface.co/Gabriel166/MORAD"><span aria-hidden="true">🤗</span> Model</a>
+        <a class="btn ghost" href="https://huggingface.co/datasets/Gabriel166/MORAD-data"><span aria-hidden="true">🤗</span> Data</a>
+        <a class="btn ghost" href="#citation">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 7h4v4H7zM13 7h4v4h-4zM7 11c0 3-1 5-3 6M13 11c0 3-1 5-3 6"/></svg>
+          BibTeX
+        </a>
+      </div>
+
+      <figure class="figure">
+        <picture>
+          <source srcset="static/images/overview.webp" type="image/webp">
+          <img src="static/images/overview.png" width="2000" height="862" alt="MORAD training loop: group sampling, six measurements, bounded reward and group weights, forward-process update">
+        </picture>
+        <figcaption class="caption"><b>MORAD training loop.</b> Backbone-conditioned sampling produces candidate sequences. Three evaluation channels provide the six-component reward and group-relative weights. Forward-noised candidates train the shared policy under a frozen-reference constraint; EMA feedback refreshes the sampler.</figcaption>
+      </figure>
+
+      <div class="stats" role="list">
+        <div class="stat" role="listitem"><div class="num">+16.0%</div><div class="lbl">GDT-TS</div><div class="sub">0.3300 → 0.3827</div></div>
+        <div class="stat" role="listitem"><div class="num">+19.4%</div><div class="lbl">Pairing MCC</div><div class="sub">0.6110 → 0.7295</div></div>
+        <div class="stat" role="listitem"><div class="num">−27.5%</div><div class="lbl">Normalized ensemble defect</div><div class="sub">0.3906 → 0.2830</div></div>
+        <div class="stat" role="listitem"><div class="num">10 / 11</div><div class="lbl">Metrics improved</div><div class="sub">over a tertiary-only reward</div></div>
+      </div>
+    </div>
+  </header>
+
+  <section id="abstract">
+    <div class="wrap">
+      <div class="sec-head"><span class="sec-num">01</span><h2>Abstract</h2></div>
+      <div class="abstract">
+        We introduce <strong>MORAD</strong>, an online reinforcement learning framework for backbone-conditioned RNA diffusion models that trains a single shared policy across diverse target backbones. Structure-conditioned RNA inverse design seeks nucleotide sequences compatible with a target three-dimensional backbone, yet existing reinforcement learning approaches either optimize a separate policy for each target backbone or rely on offline preference optimization, leaving online post-training of a reusable backbone-conditioned model largely unexplored. MORAD combines backbone-conditioned group sampling, group-relative reward normalization, and a forward-process diffusion objective. Beyond existing RL rewards that primarily target tertiary structural quality, MORAD jointly optimizes six measurements spanning tertiary geometry, base pairing, ensemble behavior, and sequence composition. To aggregate these heterogeneous objectives despite differences in scale and optimization direction, MORAD maps each measurement to a bounded desirability score and combines them with a weighted geometric mean. Compared with a tertiary-structure-only reward, this multi-objective formulation improves <strong>10 of the 11</strong> evaluation metrics that have a preferred direction. Applied to pretrained RIDE, MORAD improves GDT-TS by <strong>16.0%</strong> (from 0.3300 to 0.3827) and pairing MCC by <strong>19.4%</strong> (from 0.6110 to 0.7295), while reducing normalized ensemble defect by <strong>27.5%</strong> (from 0.3906 to 0.2830). On the test set, MORAD outperforms RiboDiffusion, gRNAde, and RDesign across tertiary structural accuracy, secondary-structure pairing, and thermodynamic quality, establishing a new state of the art in structure-conditioned RNA inverse design.
+      </div>
+    </div>
+  </section>
+
+  <section id="method">
+    <div class="wrap">
+      <div class="sec-head"><span class="sec-num">02</span><h2>Method</h2></div>
+      <p class="lead">MORAD post-trains one backbone-conditioned diffusion policy across many target backbones, so the trained model designs sequences for a new backbone directly at inference, with no per-target optimization.</p>
+
+      <div class="pillars">
+        <div class="pillar">
+          <div class="ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="6" r="2.5"/><circle cx="18" cy="6" r="2.5"/><circle cx="6" cy="18" r="2.5"/><circle cx="18" cy="18" r="2.5"/><path d="M12 9v6M9 12h6"/></svg></div>
+          <h4>Shared-policy online post-training</h4>
+          <p>Backbone-conditioned group sampling, group-relative reward normalization and a forward-process diffusion objective, applied to the pretrained RIDE model.</p>
+        </div>
+        <div class="pillar">
+          <div class="ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l2.6 5.6L20 9l-4 4.2.9 6.3L12 16.8 7.1 19.5 8 13.2 4 9l5.4-1.4z"/></svg></div>
+          <h4>Six-objective reward</h4>
+          <p>Tertiary geometry (GDT-TS, TM-score, RMSD), base pairing (MCC), ensemble behavior (normalized ensemble defect) and sequence composition.</p>
+        </div>
+        <div class="pillar">
+          <div class="ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19h16M4 15l4-4 4 3 8-8"/></svg></div>
+          <h4>Bounded desirability, geometric mean</h4>
+          <p>Each measurement is mapped to a bounded desirability score and the scores are combined with a weighted geometric mean, so no single objective dominates.</p>
+        </div>
+      </div>
+
+      <h3>The MORAD reward</h3>
+      <figure class="figure" style="margin-top:6px">
+        <picture>
+          <source srcset="static/images/reward.webp" type="image/webp">
+          <img src="static/images/reward.png" width="2000" height="861" loading="lazy" alt="RIDER and MORAD reward construction">
+        </picture>
+        <figcaption class="caption"><b>RIDER and MORAD reward construction.</b> RIDER scores tertiary structural consistency. MORAD combines three tertiary measurements, pairing agreement, normalized ensemble defect and composition deviation; each desirability score lies in [δ, 1].</figcaption>
+      </figure>
+
+      <div class="eqs">
+        <div class="eq"><div class="k">1 · Normalize</div>$$u_j=\mathrm{clip}\Big(\tfrac{m_j-a_j}{b_j-a_j},\,0,\,1\Big)$$</div>
+        <div class="eq"><div class="k">2 · Desirability</div>$$d_j=\max\Big(\delta,\,\tfrac{1-\cos(\pi u_j)}{2}\Big)$$</div>
+        <div class="eq"><div class="k">3 · Aggregate</div>$$R=\exp\Big(\textstyle\sum_{j\in\mathcal J}\tilde w_j\log d_j\Big)$$</div>
+      </div>
+      <p class="tbl-note" style="margin-bottom:14px">Each measurement \(m_j\) runs between a low anchor \(a_j\) and a high anchor \(b_j\); \(\tilde w_j = w_j / \sum_{k\in\mathcal J} w_k\) normalizes the weights over the available measurements \(\mathcal J\).</p>
+
+      <div class="tbl-wrap">
+        <table class="anchors">
+          <thead><tr><th>Measurement</th><th>\(a_j\)</th><th>\(b_j\)</th><th>\(w_j\)</th></tr></thead>
+          <tbody>
+            <tr><td>GDT-TS</td><td>0.20</td><td>0.75</td><td>0.25</td></tr>
+            <tr><td>TM-score</td><td>0.20</td><td>0.70</td><td>0.30</td></tr>
+            <tr><td>RMSD (Å)</td><td>12.0</td><td>2.0</td><td>0.30</td></tr>
+            <tr><td>Secondary-structure MCC</td><td>0.30</td><td>0.85</td><td>0.05</td></tr>
+            <tr><td>Ensemble defect / nucleotide</td><td>0.60</td><td>0.15</td><td>0.05</td></tr>
+            <tr><td>Composition deviation</td><td>0.50</td><td>0.02</td><td>0.05</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <section id="results">
+    <div class="wrap">
+      <div class="sec-head"><span class="sec-num">03</span><h2>Results</h2></div>
+      <p class="lead">All models are evaluated on the same 153 test targets. MORAD is the policy after update 390; best values are in bold.</p>
+
+      <div class="tabs" role="tablist" aria-label="Result tables">
+        <button class="tab" role="tab" id="t-tert" aria-controls="p-tert" aria-selected="true">Tertiary structure</button>
+        <button class="tab" role="tab" id="t-pair" aria-controls="p-pair" aria-selected="false">Secondary-structure pairing</button>
+        <button class="tab" role="tab" id="t-thermo" aria-controls="p-thermo" aria-selected="false">Thermodynamics</button>
+        <button class="tab" role="tab" id="t-reward" aria-controls="p-reward" aria-selected="false">Reward comparison</button>
+      </div>
+
+      <div class="panel" id="p-tert" role="tabpanel" aria-labelledby="t-tert">
+        <p class="panel-cap">Candidate 0 of each target, structures predicted with RhoFold+.</p>
+        <div class="tbl-wrap">
+          <table>
+            <thead><tr><th>Model</th><th>GDT-TS ↑</th><th>TM (C4′) ↑</th><th>RMSD (Å) ↓</th><th>TM (C1′) ↑</th><th>Success ↑</th><th>Recovery ↑</th><th>lDDT (C4′) ↑</th><th>pLDDT ↑</th><th>Coarse clash ↓</th></tr></thead>
+            <tbody>
+              <tr><td>RiboDiffusion</td><td>0.3132</td><td>0.2839</td><td>10.9215</td><td>0.3613</td><td>0.2549</td><td><b>0.5165</b></td><td>0.6174</td><td><b>0.6937</b></td><td>73.5383</td></tr>
+              <tr><td>gRNAde (T=0.1)</td><td>0.3591</td><td>0.3179</td><td>8.8374</td><td>0.3642</td><td>0.2484</td><td>0.5115</td><td>0.6607</td><td>0.6482</td><td>23.7261</td></tr>
+              <tr><td>RDesign</td><td>0.3291</td><td>0.2902</td><td>10.3441</td><td>0.3392</td><td>0.2549</td><td>0.4720</td><td>0.6368</td><td>0.6202</td><td>40.4457</td></tr>
+              <tr><td>RIDE</td><td>0.3300</td><td>0.2841</td><td>9.7199</td><td>0.3538</td><td>0.2484</td><td>0.5039</td><td>0.6622</td><td>0.6671</td><td>22.7503</td></tr>
+              <tr class="ours"><td>MORAD</td><td><b>0.3827</b></td><td><b>0.3400</b></td><td><b>7.9196</b></td><td><b>0.3855</b></td><td><b>0.3007</b></td><td>0.5056</td><td><b>0.6774</b></td><td>0.6726</td><td><b>11.9438</b></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="panel" id="p-pair" role="tabpanel" aria-labelledby="t-pair" hidden>
+        <p class="panel-cap">Candidate 0; EternaFold predictions compared with base pairs extracted from the native 3D structures.</p>
+        <div class="tbl-wrap">
+          <table>
+            <thead><tr><th>Model</th><th>Precision ↑</th><th>Recall ↑</th><th>F1 ↑</th><th>MCC ↑</th></tr></thead>
+            <tbody>
+              <tr><td>RiboDiffusion</td><td>0.3563</td><td>0.3074</td><td>0.3212</td><td>0.3267</td></tr>
+              <tr><td>gRNAde (T=0.1)</td><td>0.7276</td><td>0.6099</td><td>0.6482</td><td>0.6734</td></tr>
+              <tr><td>RDesign</td><td>0.7084</td><td>0.6110</td><td>0.6462</td><td>0.6566</td></tr>
+              <tr><td>RIDE</td><td>0.6472</td><td>0.5717</td><td>0.5939</td><td>0.6110</td></tr>
+              <tr class="ours"><td>MORAD</td><td><b>0.7824</b></td><td><b>0.6816</b></td><td><b>0.7226</b></td><td><b>0.7295</b></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="panel" id="p-thermo" role="tabpanel" aria-labelledby="t-thermo" hidden>
+        <p class="panel-cap">153 targets, ViennaRNA.</p>
+        <div class="tbl-wrap">
+          <table>
+            <thead><tr><th>Model</th><th>MFE ∼</th><th>EFE ∼</th><th>NED ↓</th><th>PE ↓</th><th>MFEfreq ↑</th></tr></thead>
+            <tbody>
+              <tr><td>RiboDiffusion</td><td>-21.716</td><td>-22.847</td><td>0.6056</td><td>0.4284</td><td>0.2980</td></tr>
+              <tr><td>gRNAde (T=0.1)</td><td>-28.092</td><td>-28.918</td><td>0.3458</td><td>0.2652</td><td>0.4289</td></tr>
+              <tr><td>gRNAde (T=0.8)</td><td>-25.186</td><td>-26.212</td><td>0.3830</td><td>0.3260</td><td>0.3266</td></tr>
+              <tr><td>RDesign</td><td>-28.863</td><td>-29.708</td><td>0.3349</td><td>0.2775</td><td>0.3961</td></tr>
+              <tr><td>RIDE</td><td>-23.614</td><td>-24.643</td><td>0.3906</td><td>0.3059</td><td>0.3350</td></tr>
+              <tr class="ours"><td>MORAD</td><td>-30.149</td><td>-30.937</td><td><b>0.2830</b></td><td><b>0.2102</b></td><td><b>0.4402</b></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="tbl-note">MFE / EFE: minimum and ensemble free energy (kcal/mol), shown for context. NED: normalized ensemble defect. PE: positional entropy. MFEfreq: probability of the minimum-free-energy structure.</p>
+      </div>
+
+      <div class="panel" id="p-reward" role="tabpanel" aria-labelledby="t-reward" hidden>
+        <p class="panel-cap">Two policies post-trained from the same pretrained RIDE with the same data, optimizer and schedule; only the reward differs.</p>
+        <div class="tbl-wrap">
+          <table>
+            <thead><tr><th>Measurement</th><th>RIDE</th><th>+ Structural reward</th><th>+ MORAD reward</th></tr></thead>
+            <tbody>
+              <tr><td>GDT-TS ↑</td><td>0.3300</td><td>0.3627</td><td><b>0.3694</b></td></tr>
+              <tr><td>TM-score ↑</td><td>0.2841</td><td>0.3194</td><td><b>0.3358</b></td></tr>
+              <tr><td>RMSD (Å) ↓</td><td>9.720</td><td>8.369</td><td><b>8.207</b></td></tr>
+              <tr><td>C1′ TM ↑</td><td>0.3538</td><td>0.3818</td><td><b>0.3919</b></td></tr>
+              <tr><td>MCC ↑</td><td>0.6208</td><td>0.6612</td><td><b>0.6978</b></td></tr>
+              <tr><td>F1 ↑</td><td>0.6103</td><td>0.6568</td><td><b>0.6901</b></td></tr>
+              <tr><td>ED (nt) ↓</td><td>29.08</td><td>26.85</td><td><b>24.27</b></td></tr>
+              <tr><td>ED/nt ↓</td><td>0.3872</td><td>0.3569</td><td><b>0.3256</b></td></tr>
+              <tr><td>Recovery ↑</td><td>0.5033</td><td>0.5097</td><td><b>0.5124</b></td></tr>
+              <tr><td>H<sub>pair</sub> ↓</td><td>0.3249</td><td>0.2851</td><td><b>0.2800</b></td></tr>
+              <tr><td>p<sub>MFE</sub> ↑</td><td>0.3281</td><td><b>0.3880</b></td><td>0.3847</td></tr>
+              <tr><td>MFE (kcal/mol)</td><td>-23.77</td><td>-29.81</td><td>-26.49</td></tr>
+              <tr><td>GC fraction</td><td>0.5304</td><td>0.5912</td><td>0.4970</td></tr>
+              <tr><td>Hamming diversity</td><td>0.2971</td><td>0.2224</td><td>0.2607</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="tbl-note">MFE, GC fraction and within-target Hamming diversity are shown for context.</p>
+      </div>
+
+      <h3>Training dynamics</h3>
+      <figure class="figure" style="margin-top:6px">
+        <picture>
+          <source srcset="static/images/training_curve.webp" type="image/webp">
+          <img src="static/images/training_curve.png" width="2000" height="922" loading="lazy" alt="Structural scores over training updates 0 to 390">
+        </picture>
+        <figcaption class="caption"><b>Structural-score trends over all 40 evaluations during training</b> (updates 0–390). Thick lines show a centered five-point moving average; faint traces show the raw scores, with one sampled candidate per target.</figcaption>
+      </figure>
+    </div>
+  </section>
+
+  <section id="data">
+    <div class="wrap">
+      <div class="sec-head"><span class="sec-num">04</span><h2>Data</h2></div>
+      <div class="split">
+        <div class="tile"><div class="num">527</div><div class="lbl">Training targets</div><div class="sub">27–258 nt · median 75</div></div>
+        <div class="tile"><div class="num">153</div><div class="lbl">Test targets</div><div class="sub">15–186 nt · median 65</div></div>
+      </div>
+      <p>The test set is built separately from the training set. It comprises 71 <a href="https://github.com/marcellszi/rna3db">RNA3DB</a> entries, drawn from RNA3DB components that contain no training target, and 82 entries curated from the <a href="https://www.rcsb.org/">RCSB PDB</a>. No test sequence exactly matches a training sequence. Both target pools are released on <a href="https://huggingface.co/datasets/Gabriel166/MORAD-data">Hugging Face</a>.</p>
+    </div>
+  </section>
+
+  <section id="code">
+    <div class="wrap">
+      <div class="sec-head"><span class="sec-num">05</span><h2>Get started</h2></div>
+      <p>The repository contains the full training and evaluation code, configuration files for every reported run, and scripts that regenerate each table and figure of the paper.</p>
+      <div class="code">
+        <button class="copy" type="button" data-copy="quickstart">Copy</button>
+<pre id="quickstart">git clone https://github.com/Gabrile166/MORAD.git && cd MORAD
+bash scripts/setup_third_party.sh      <span class="c"># RhoFold+, US-align, EternaFold</span>
+bash scripts/download_assets.sh        <span class="c"># RIDE + RhoFold+ weights, data, MORAD checkpoint</span>
+bash scripts/evaluate_test153.sh morad <span class="c"># evaluate the released model on the 153 test targets</span>
+bash scripts/train_morad.sh            <span class="c"># train MORAD from pretrained RIDE (4 GPUs)</span></pre>
+      </div>
+      <div class="res-links">
+        <a class="res" href="https://github.com/Gabrile166/MORAD"><span class="ic" aria-hidden="true">⌘</span><div><b>Code</b><span>Training, evaluation and reproduction scripts</span></div></a>
+        <a class="res" href="https://huggingface.co/Gabriel166/MORAD"><span class="ic" aria-hidden="true">🤗</span><div><b>Model</b><span>MORAD policy after 390 updates</span></div></a>
+        <a class="res" href="https://huggingface.co/datasets/Gabriel166/MORAD-data"><span class="ic" aria-hidden="true">🤗</span><div><b>Data</b><span>527 training and 153 test targets</span></div></a>
+      </div>
+    </div>
+  </section>
+
+  <section id="citation">
+    <div class="wrap">
+      <div class="sec-head"><span class="sec-num">06</span><h2>Citation</h2></div>
+      <div class="code">
+        <button class="copy" type="button" data-copy="bibtex">Copy</button>
+<pre id="bibtex">@misc{tang2026morad,
+  title  = {{MORAD}: Reinforcement Learning with Multi-Objective Rewards for {RNA} Inverse Design},
+  author = {Tang, Jixin and Guo, Ji and Zhao, Jun},
+  year   = {2026}
+}</pre>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <p>MORAD builds on the RIDE model and code of <a href="https://github.com/COLA-Laboratory/RIDER">RIDER</a>. We also use <a href="https://github.com/ml4bio/RhoFold">RhoFold+</a>, <a href="https://github.com/pylelab/USalign">US-align</a>, <a href="https://www.tbi.univie.ac.at/RNA/">ViennaRNA</a>, <a href="https://github.com/eternagame/EternaFold">EternaFold</a> and <a href="https://github.com/marcellszi/rna3db">RNA3DB</a>, and compare with <a href="https://github.com/ml4bio/RiboDiffusion">RiboDiffusion</a>, <a href="https://github.com/chaitjo/geometric-rna-design">gRNAde</a> and <a href="https://github.com/A4Bio/RDesign">RDesign</a>. We thank the authors for making their work available.</p>
+    <p>Code released under the Apache License 2.0.</p>
+  </div>
+</footer>
+
+<script>
+(function () {
+  document.documentElement.classList.add('js');
+
+  // Theme toggle, remembered per browser.
+  var root = document.documentElement, key = 'morad-theme';
+  try { var saved = localStorage.getItem(key); if (saved) root.setAttribute('data-theme', saved); } catch (e) {}
+  document.getElementById('theme').addEventListener('click', function () {
+    var dark = root.getAttribute('data-theme') === 'dark' ||
+      (!root.getAttribute('data-theme') && window.matchMedia('(prefers-color-scheme: dark)').matches);
+    var next = dark ? 'light' : 'dark';
+    root.setAttribute('data-theme', next);
+    try { localStorage.setItem(key, next); } catch (e) {}
+  });
+
+  // Result tabs.
+  var tabs = Array.prototype.slice.call(document.querySelectorAll('[role="tab"]'));
+  function select(tab) {
+    tabs.forEach(function (t) {
+      var on = t === tab;
+      t.setAttribute('aria-selected', on ? 'true' : 'false');
+      t.tabIndex = on ? 0 : -1;
+      document.getElementById(t.getAttribute('aria-controls')).hidden = !on;
+    });
+  }
+  tabs.forEach(function (tab, i) {
+    tab.addEventListener('click', function () { select(tab); });
+    tab.addEventListener('keydown', function (e) {
+      var d = e.key === 'ArrowRight' ? 1 : e.key === 'ArrowLeft' ? -1 : 0;
+      if (d) { var n = tabs[(i + d + tabs.length) % tabs.length]; select(n); n.focus(); }
+    });
+  });
+
+  // Copy buttons.
+  Array.prototype.forEach.call(document.querySelectorAll('.copy'), function (btn) {
+    btn.addEventListener('click', function () {
+      var text = document.getElementById(btn.getAttribute('data-copy')).innerText;
+      var done = function () { btn.textContent = 'Copied'; setTimeout(function () { btn.textContent = 'Copy'; }, 1500); };
+      if (navigator.clipboard) navigator.clipboard.writeText(text).then(done, function () {});
+    });
+  });
+
+  // Math.
+  window.addEventListener('load', function () {
+    if (window.renderMathInElement) {
+      renderMathInElement(document.body, {
+        delimiters: [{ left: '$$', right: '$$', display: true }, { left: '\\(', right: '\\)', display: false }],
+        throwOnError: false
+      });
+    }
+  });
+})();
+</script>
+</body>
+</html>
