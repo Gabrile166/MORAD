@@ -1,0 +1,12 @@
+--extra-index-url https://download.pytorch.org/whl/cu124
+
+torch==2.6.0+cu124
+numpy==2.2.3
+biopython==1.85
+einops==0.8.1
+ml-collections==1.0.0
+matplotlib==3.10.1
+openmm==8.2.0
+scipy==1.15.2
+pandas==2.2.3
+tqdm==4.67.1

@@ -1,0 +1,48 @@
+schema_version: ride_ribodiffusion_eval.v1
+
+# Held-out evaluation run during training (Figure 3).
+#
+# The validation workers (src/rl/sharded_validation.py) split the 153 test
+# targets into one shard per validation device and override, per shard,
+# ride.pool_manifest / ride.device / sampling.target_limit, the RhoFold+ and
+# US-align paths in metrics.tertiary, and output.dir. The policy snapshot is
+# passed through RIDE_CHECKPOINT. Candidate 0 of each target is folded and scored.
+ride:
+  rl_config: configs/ride_policy.yaml
+  pool_manifest: artifacts/pools/test153.pt
+  device: "cuda:0"
+
+sampling:
+  generator: ride
+  seed: 20260826
+  target_limit: 999
+  n_samples: 8
+  paper_diversity: true
+  temperature: 0.8
+
+metrics:
+  sequence:
+    enabled: true
+  secondary:
+    enabled: false
+    reason: "pairing and thermodynamic metrics are computed after training (scripts/eval/run_sstt.py)"
+  tertiary:
+    enabled: true
+    candidate_limit_per_target: 1
+    rhofold_python: "${RHOFOLD_PYTHON:-python}"
+    worker_script: scripts/rhofold_oracle_worker.py
+    checkpoint: "${RHOFOLD_CHECKPOINT:-../third_party/rhofold_protocol/checkpoints/rhofold_pretrained_params.pt}"
+    cache_dir: cache/validation
+    timeout_s: 600
+    device: "cuda:0"
+    usalign_binary: "${USALIGN_BINARY:-../third_party/USalign/USalign}"
+    usalign_timeout_s: 120
+  rfam:
+    enabled: false
+    reason: "not part of the reported protocol"
+  drfold:
+    enabled: false
+    reason: "not part of the reported protocol"
+
+output:
+  dir: outputs/validation/_eval

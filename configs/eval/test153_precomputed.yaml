@@ -1,0 +1,52 @@
+schema_version: ride_ribodiffusion_eval.v1
+
+# Final evaluation on the 153 test targets for baselines whose sequences were
+# generated with their official code (RiboDiffusion, gRNAde, RDesign).
+#
+# BASELINE_DIR must contain fasta/<target_id>_<k>.fasta for k = 0..7, one
+# designed sequence per file, for every target in the pool. Everything else
+# (seed, candidate-0 folding, RhoFold+, US-align, RNAfold) matches test153.yaml.
+ride:
+  rl_config: configs/ride_policy.yaml
+  pool_manifest: "${EVAL_POOL:-artifacts/pools/test153.pt}"
+
+sampling:
+  generator: precomputed
+  seed: 20260823
+  target_limit: 153
+  n_samples: 8
+  paper_diversity: true
+
+precomputed:
+  model_name: "${BASELINE_NAME:-baseline}"
+  directory: "${BASELINE_DIR}"
+  pattern: "fasta/{target_id}_*.fasta"
+
+metrics:
+  sequence:
+    enabled: true
+  secondary:
+    enabled: true
+    rnafold_binary: "${RNAFOLD_BINARY:-RNAfold}"
+    timeout_s: 30
+    native_f1_threshold: 0.7
+  tertiary:
+    enabled: true
+    candidate_limit_per_target: 1
+    rhofold_python: "${RHOFOLD_PYTHON:-python}"
+    worker_script: scripts/rhofold_oracle_worker.py
+    checkpoint: "${RHOFOLD_CHECKPOINT:-../third_party/rhofold_protocol/checkpoints/rhofold_pretrained_params.pt}"
+    cache_dir: cache/evaluation/rhofold
+    timeout_s: 300
+    device: "${RHOFOLD_DEVICE:-cuda:0}"
+    usalign_binary: "${USALIGN_BINARY:-../third_party/USalign/USalign}"
+    usalign_timeout_s: 120
+  rfam:
+    enabled: false
+    reason: "not part of the reported protocol"
+  drfold:
+    enabled: false
+    reason: "not part of the reported protocol"
+
+output:
+  dir: outputs/eval/test153_baseline

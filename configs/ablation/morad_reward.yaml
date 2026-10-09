@@ -1,0 +1,149 @@
+# Reward comparison (Table 4): MORAD reward (+ MORAD reward).
+#
+# The two configs in this directory are identical except for the reward block
+# (preset and the metric-cache version it implies): same pretrained RIDE, same
+# 527 training targets, optimizer, schedule and hardware (4 GPUs, 4 targets x 8
+# candidates per update, two epochs = 263 updates). Each run is evaluated at its
+# last policy snapshot, update 260, with configs/eval/test153.yaml.
+#
+# Launch with scripts/train_reward_comparison.sh.
+
+data:
+  pool_manifest: artifacts/pools/train527.pt
+  ride_checkpoint: artifacts/models/ride/checkpoint.h5
+  condition_noise_scale: 0.0
+  condition_snapshot_enabled: false
+  x0_representation: one_hot_01
+
+ride_model:
+  node_in_dim: [15, 4]
+  node_h_dim: [256, 24]
+  edge_in_dim: [131, 3]
+  edge_h_dim: [128, 4]
+  num_layers: 5
+  drop_rate: 0.5
+  out_dim: 4
+  time_cond: true
+
+noise_schedule:
+  schedule: linear
+  continuous_beta_0: 0.1
+  continuous_beta_1: 20.0
+  eps: 0.001
+
+rollout:
+  group_size: 8
+  sampler:
+    name: x0_renoise
+    n_steps: 50
+    version: v1
+  temperature:
+    initial: 1.0
+    min: 0.2
+    max: 1.5
+    step: 0.1
+  rescue:
+    max_rounds: 1
+    min_unique_sequences: 2
+    min_valid_sequences: 2
+
+reward:
+  oracle:
+    backend: local_jsonl_worker
+    python: ${RHOFOLD_PYTHON:-python}
+    worker_script: scripts/rhofold_oracle_worker.py
+    ckpt: ${RHOFOLD_CHECKPOINT:-../third_party/rhofold_protocol/checkpoints/rhofold_pretrained_params.pt}
+    output_dir: outputs/ablation/morad_reward/oracle
+    timeout_sec: 600
+    device: cuda:0
+    fake: false
+  metric_cache:
+    dir: ${RIDE_RL_CACHE:-cache/rl_metrics}
+    metric_version: ride_evaluator_v2_geo6
+    alignment_config: c4p_kabsch_centered
+  composer:
+    # MORAD reward: six bounded desirabilities combined by a weighted geometric
+    # mean (GDT-TS .25 / TM-score .30 / RMSD .30 / pairing MCC .05 /
+    # normalized ensemble defect .05 / composition KL .05).
+    preset: morad
+    good:
+      gdt_ts: 0.5
+      tm_score: 0.5
+      rmsd: 4.0
+
+advantage:
+  group_normalize: true
+  z_clip: 2.0
+  scale:
+    kind: ema
+    decay: 0.95
+    epsilon: 1.0e-06
+    min_valid: 2
+
+trainer:
+  loss:
+    nft_beta: 0.1
+    reference_weight: 0.02
+    k_t: 8
+    weighting: uniform_eps
+    residual_normalization: none
+    divide_by_beta: true
+  optim:
+    lr: 1.0e-4
+    weight_decay: 0.0
+    grad_clip_norm: 1.0
+    gradient_accumulation_steps: 1
+    amp: false
+    microbatch_size: 1
+    lr_schedule: warmup_cosine
+    lr_warmup_ratio: 0.05
+    lr_min_ratio: 0.1
+    lr_total_steps: 263
+  ema:
+    decay_max: 0.999
+    update_interval: 1
+
+runtime:
+  seed: 0
+  device: cuda
+  mode: train
+  ranks_per_target: 1
+  # 527 targets x 2 epochs / 4 targets per update = 263 updates.
+  epochs: 2
+  shuffle_targets: true
+  shuffle_seed: 20260826
+  budget:
+    max_outer_steps: 263
+    max_oracle_calls: 200000
+    max_wall_hours: 72.0
+    checkpoint_every_oracle_calls: 128
+
+validation:
+  # Writes a policy snapshot every 10 updates and scores it on the 153 test
+  # targets in a detached process; training does not read the result.
+  enabled: true
+  pool_manifest: artifacts/pools/test153.pt
+  config: configs/eval/validation.yaml
+  devices: "cuda:0,cuda:1,cuda:2,cuda:3"
+  test_freq: 10
+  before_train: true
+  n_samples: 8
+  timeout_sec: 7200.0
+  usalign_binary: ${USALIGN_BINARY:-../third_party/USalign/USalign}
+  keep_runs: 0
+
+logging:
+  jsonl: outputs/ablation/morad_reward/train.jsonl
+  wandb:
+    enabled: false
+    project: morad
+    name: ablation-morad_reward
+    tags: [morad, reward-comparison, morad_reward]
+
+checkpoint:
+  dir: outputs/ablation/morad_reward/checkpoints
+  save_latest: true
+
+evaluation:
+  deterministic_anchor_temperature: 0.0
+  group_size: 2
